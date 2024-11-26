@@ -113,7 +113,8 @@ int main(void)
 	  	 if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6))
 	  	 {
 
-
+	  		//turn on blue LED
+	  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_SET);
 
 
 			 while(1)
@@ -143,7 +144,11 @@ int main(void)
 
   /* USER CODE END 3 */
 			 }
-	  	 }
+	  	 }else{
+		  		//turn off blue LED
+		  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_RESET);
+		  	 }
+
   }
 }
 
