@@ -69,88 +69,76 @@ static void MX_TIM2_Init(void);
   */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_TIM2_Init();
-  /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-
+ /* USER CODE BEGIN 1 */
+ /* USER CODE END 1 */
+ /* MCU Configuration--------------------------------------------------------*/
+ /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+ HAL_Init();
+ /* USER CODE BEGIN Init */
+ /* USER CODE END Init */
+ /* Configure the system clock */
+ SystemClock_Config();
+ /* USER CODE BEGIN SysInit */
+ /* USER CODE END SysInit */
+ /* Initialize all configured peripherals */
+ MX_GPIO_Init();
+ MX_USART2_UART_Init();
+ MX_TIM2_Init();
+ /* USER CODE BEGIN 2 */
+ HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+ /* USER CODE END 2 */
+ /* Infinite loop */
+ /* USER CODE BEGIN WHILE */
+ while (1)
+ {
+   /* USER CODE END WHILE */
+   /* USER CODE BEGIN 3 */
 	// if there is movement at the door (connects to the ultrasonic sensor)
-
-
 	  	 if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6))
 	  	 {
-
-	  		//turn on blue LED
+	  		//turn on green LED
 	  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_SET);
+	  		 int x = 10;
+	  		 __HAL_TIM_SET_AUTORELOAD(&htim2, x*100);
+			 __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_2, x*50);
+			 HAL_Delay(100);
+			 x++;
+			 if (x > 30) x = 10;
 
 
 			 while(1)
 			 {
-
 				if (HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_8))
 				{
 					//turn off blinking red LED
 					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
 
 
-
-
+					buzzer_on = 0;
+					HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
+					break;
 			    }
-
 				else
 				{
+				  buzzer_on = 1;
+				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
 
 				  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
 				  HAL_Delay(1000);
 				  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
 				  HAL_Delay(1000);
-
-
 			    }
-
-  /* USER CODE END 3 */
+ /* USER CODE END 3 */
 			 }
-	  	 }else{
-		  		//turn off blue LED
-		  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_RESET);
-		  	 }
-
-  }
+	  	 } else{
+	  		//turn off blue LED
+	  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_RESET);
+	  	 }
+ }
 }
+
 
 /**
   * @brief System Clock Configuration
