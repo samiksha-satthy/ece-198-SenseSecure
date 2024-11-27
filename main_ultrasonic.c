@@ -21,12 +21,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define usTIM TIM4
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -40,12 +42,11 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-int buzzer_on = 1;
 
 /* USER CODE END PV */
 
@@ -53,14 +54,18 @@ int buzzer_on = 1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM2_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
-
+void usDelay(uint32_t uSec);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+//Speed of sound
+const float speedOfSound = 0.0343/2;
+float distance;
 
+char uartBuf[100];
 /* USER CODE END 0 */
 
 /**
@@ -69,76 +74,88 @@ static void MX_TIM2_Init(void);
   */
 int main(void)
 {
- /* USER CODE BEGIN 1 */
- /* USER CODE END 1 */
- /* MCU Configuration--------------------------------------------------------*/
- /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
- HAL_Init();
- /* USER CODE BEGIN Init */
- /* USER CODE END Init */
- /* Configure the system clock */
- SystemClock_Config();
- /* USER CODE BEGIN SysInit */
- /* USER CODE END SysInit */
- /* Initialize all configured peripherals */
- MX_GPIO_Init();
- MX_USART2_UART_Init();
- MX_TIM2_Init();
- /* USER CODE BEGIN 2 */
- HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
- HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
- /* USER CODE END 2 */
- /* Infinite loop */
- /* USER CODE BEGIN WHILE */
- while (1)
- {
-   /* USER CODE END WHILE */
-   /* USER CODE BEGIN 3 */
-	// if there is movement at the door (connects to the ultrasonic sensor)
-	  	 if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6))
-	  	 {
-	  		//turn on green LED
-	  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_SET);
-	  		 int x = 10;
-	  		 __HAL_TIM_SET_AUTORELOAD(&htim2, x*100);
-			 __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_2, x*50);
-			 HAL_Delay(100);
-			 x++;
-			 if (x > 30) x = 10;
 
+  /* USER CODE BEGIN 1 */
+	uint32_t numTicks = 0;
+  /* USER CODE END 1 */
 
-			 while(1)
-			 {
-				if (HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_8))
-				{
-					//turn off blinking red LED
-					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
+  /* MCU Configuration--------------------------------------------------------*/
 
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-					buzzer_on = 0;
-					HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
-					break;
-			    }
-				else
-				{
-				  buzzer_on = 1;
-				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  /* USER CODE BEGIN Init */
 
+  /* USER CODE END Init */
 
-				  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
-				  HAL_Delay(1000);
-				  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
-				  HAL_Delay(1000);
-			    }
- /* USER CODE END 3 */
-			 }
-	  	 } else{
-	  		//turn off blue LED
-	  		HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_RESET);
-	  	 }
- }
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART2_UART_Init();
+  MX_TIM4_Init();
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+	  //Set TRIG to LOW for few uSec
+	  		HAL_GPIO_WritePin(TRIG_GPIO_Port, TRIG_Pin, GPIO_PIN_RESET);
+	  		usDelay(3);
+
+	  		//*** START Ultrasonic measure routine ***//
+	  		//1. Output 10 usec TRIG
+	  		HAL_GPIO_WritePin(TRIG_GPIO_Port, TRIG_Pin, GPIO_PIN_SET);
+	  		usDelay(10);
+	  		HAL_GPIO_WritePin(TRIG_GPIO_Port, TRIG_Pin, GPIO_PIN_RESET);
+
+	  		//2. Wait for ECHO pin rising edge
+	  		while(HAL_GPIO_ReadPin(ECHO_GPIO_Port, ECHO_Pin) == GPIO_PIN_RESET);
+
+	  		//3. Start measuring ECHO pulse width in
+	  		numTicks = 0;
+	  		while(HAL_GPIO_ReadPin(ECHO_GPIO_Port, ECHO_Pin) == GPIO_PIN_SET)
+	  		{
+	  			numTicks++;
+	  			usDelay(2); //2.8usec
+	  		};
+
+	  		//4. Estimate distance
+	  		distance = (numTicks + 0.0f)*2.8*speedOfSound;
+
+	  		//5. Print to UART terminal for debugging
+	  		//sprintf(uartBuf, "Distance  <cm> = %1f\r\n", distance);
+	  		HAL_UART_Transmit(&huart2, (uint8_t *)uartBuf, strlen(uartBuf), 100);
+
+	  		//HAL_GPIO_WritePin(LEDB9_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+
+	  		//HAL_GPIO_WritePin(CONNECTION_GPIO_Port, CONNECTION_Pin, GPIO_PIN_SET);
+	  		if (distance < 30.0) // Example threshold distance in cm
+	  		{
+	  		    HAL_GPIO_WritePin(CONNECTION_GPIO_Port, CONNECTION_Pin, GPIO_PIN_SET); // Send signal
+	  		    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+	  		    //HAL_Delay(1000);
+	  		}
+	  		else
+	  		{
+	  		    HAL_GPIO_WritePin(CONNECTION_GPIO_Port, CONNECTION_Pin, GPIO_PIN_RESET); // No signal
+	  		   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+	  		}
+	  		HAL_Delay(1000);
+  }
+  /* USER CODE END 3 */
 }
-
 
 /**
   * @brief System Clock Configuration
@@ -187,61 +204,47 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief TIM2 Initialization Function
+  * @brief TIM4 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM2_Init(void)
+static void MX_TIM4_Init(void)
 {
 
-  /* USER CODE BEGIN TIM2_Init 0 */
+  /* USER CODE BEGIN TIM4_Init 0 */
 
-  /* USER CODE END TIM2_Init 0 */
+  /* USER CODE END TIM4_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM2_Init 1 */
+  /* USER CODE BEGIN TIM4_Init 1 */
 
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4294967295;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 84-1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
+  /* USER CODE BEGIN TIM4_Init 2 */
 
-  /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
+  /* USER CODE END TIM4_Init 2 */
 
 }
 
@@ -291,60 +294,55 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|Blue_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LED_Pin|CONNECTION_Pin|TRIG_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Red_LED_GPIO_Port, Red_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  /*Configure GPIO pin : Button_Pin */
+  GPIO_InitStruct.Pin = Button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin Blue_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|Blue_Pin;
+  /*Configure GPIO pins : LED_Pin CONNECTION_Pin TRIG_Pin */
+  GPIO_InitStruct.Pin = LED_Pin|CONNECTION_Pin|TRIG_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : Connection_to_Board_Pin */
-  GPIO_InitStruct.Pin = Connection_to_Board_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(Connection_to_Board_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PB2 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2;
+  /*Configure GPIO pin : ECHO_Pin */
+  GPIO_InitStruct.Pin = ECHO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(ECHO_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : Push_Button_Pin */
-  GPIO_InitStruct.Pin = Push_Button_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(Push_Button_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Red_LED_Pin */
-  GPIO_InitStruct.Pin = Red_LED_Pin;
+  /*Configure GPIO pin : LED1_Pin */
+  GPIO_InitStruct.Pin = LED1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(Red_LED_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
+void usDelay(uint32_t uSec){
+	if(uSec < 2) uSec = 2;
+		usTIM->ARR = uSec - 1; 	/*sets the value in the auto-reload register*/
+		usTIM->EGR = 1; 			/*Re-initialises the timer*/
+		usTIM->SR &= ~1; 		//Resets the flag
+		usTIM->CR1 |= 1; 		//Enables the counter
+		while((usTIM->SR&0x0001) != 1);
+		usTIM->SR &= ~(0x0001);
+}
 /* USER CODE END 4 */
 
 /**
